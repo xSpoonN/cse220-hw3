@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "name": "Hw2Test",
+      "setup": "",
+      "run": "java -jar munit.jar tests/Hw3Test.class hw3.asm",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 2,
+      "points": null
+    }
+  ]
+}

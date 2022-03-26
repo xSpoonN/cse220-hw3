@@ -29,7 +29,7 @@ initialize: #a0 = filename, a1 = buffer
 		beqz $s3 initloop2
 		li $v0 14                           	       # Read file
 		syscall	
-		lw $t2 0($sp)                                  # Load char from stack
+		lbu $t2 0($sp)                                  # Load char from stack
 		li $t0 0x0A                         	       # LF
 		beq $t2 $t0 initloop	
 		li $t0 0x0D         	                       # CR
@@ -46,7 +46,7 @@ initialize: #a0 = filename, a1 = buffer
 		li $v0 14                           	       # Read file
 		syscall	
 		beqz $v0 exitinit 
-		lw $t2 0($sp)                                  # Load char from stack
+		lbu $t2 0($sp)                                  # Load char from stack
 		li $t0 0x0A                         	       # LF
 		beq $t2 $t0 initloop2	
 		li $t0 0x0D         	                       # CR
@@ -76,14 +76,14 @@ initialize: #a0 = filename, a1 = buffer
 		li $v0 14                           	       # Read file
 		syscall	
 		beqz $v0 exitinit2 
-		lw $t2 0($sp)                                  # Load char from stack
+		lbu $t2 0($sp)                                  # Load char from stack
 		li $t0 0x0A                         	       # LF
 		beq $t2 $t0 initloop3	
 		li $t0 0x0D         	                       # CR
 		beq $t2 $t0 initloop3
-		lw $t3 0($sp)                                  # Loads char from stack into s3
+		lbu $t3 0($sp)                                  # Loads char from stack into s3
 		addi $t3 $t3 -48                               # Converts to usable number
-		sw $t3 0($s1)                                  # Saves s3 char into Buffer
+		sb $t3 0($s1)                                  # Saves s3 char into Buffer
 		addi $s1 $s1 4                                 # Increment Buffer Pointer
 		j initloop3
 	
@@ -128,25 +128,25 @@ write_file: #a0: filename, a1: buffer
 	move $s1 $v0                                   # Saves string descriptor into s1
 	move $a1 $s2                                   # Restores a1 buffer address
 	
-	lw $t1 0($s2)                                  # Loads first number
+	lbu $t1 0($s2)                                  # Loads first number
 	move $s4 $t1                                   # Number of Rows save into $s4
 	addi $t1 $t1 48                                # Converts to ascii
-	sw $t1 0($sp)                                   # Temporarily saves char onto stack
+	sb $t1 0($sp)                                   # Temporarily saves char onto stack
 	move $a0 $s1
 	move $a1 $sp
 	li $a2 1
 	li $v0 15
 	syscall                                        # Writes char into file.
 	li $t0 0x0A                                    # newline
-	sw $t0 0($sp)                                  # Saves newline as temp buffer
+	sb $t0 0($sp)                                  # Saves newline as temp buffer
 	li $v0 15
 	syscall                                        # Writes char into file.
 	addi $s2 $s2 4                                 # Increment buffer pointer
 	#######################
-	lw $t1 0($s2)                                  # Loads second number
+	lbu $t1 0($s2)                                  # Loads second number
 	move $s0 $t1                                   # Number of Columns save into $s0
 	addi $t1 $t1 48                                # Converts to ascii
-	sw $t1 0($sp)                                  # Temporarily saves char onto stack
+	sb $t1 0($sp)                                  # Temporarily saves char onto stack
 	move $a0 $s1
 	move $a1 $sp
 	li $a2 1
@@ -155,17 +155,17 @@ write_file: #a0: filename, a1: buffer
 	addi $s2 $s2 4                                 # Increment buffer pointer
 	move $t3 $s0                                   # Makes a copy of column counter
 	
-	writeloop: #Writeloop
+	writeloop:
 		beqz $s4 endwrite
 		li $t0 0x0A                                    # newline
-		sw $t0 0($sp)                                  # Saves newline as temp buffer
+		sb $t0 0($sp)                                  # Saves newline as temp buffer
 		li $v0 15
 		syscall                                        # Writes char into file.
-		columnloop: #Columnloop
+		columnloop:
 			beqz $t3 endcolumns
-			lw $t1 0($s2)                                  # Loads number from buffer
+			lbu $t1 0($s2)                                  # Loads number from buffer
 			addi $t1 $t1 48                                # Converts to ascii
-			sw $t1 0($sp)                                  # Temporarily saves char onto stack
+			sb $t1 0($sp)                                  # Temporarily saves char onto stack
 			move $a0 $s1
 			move $a1 $sp
 			li $a2 1
@@ -174,12 +174,12 @@ write_file: #a0: filename, a1: buffer
 			addi $s2 $s2 4                                 # Increment buffer pointer 
 			addi $t3 $t3 -1
 			j columnloop
-		endcolumns: #Endcolumns
+		endcolumns:
 			addi $s4 $s4 -1                                # Decrement row counter
 			move $t3 $s0                                   # Reset column counter
 			j writeloop
 	
-	endwrite: #Endwrite
+	endwrite:
 		move $a0 $s1
 		li $v0 16
 		syscall
@@ -193,15 +193,140 @@ write_file: #a0: filename, a1: buffer
 	
 
 .globl rotate_clkws_90
-rotate_clkws_90:
- jr $ra
+rotate_clkws_90: #a0: buffer, a1: filename | Transpose, then reverse rows
+	addi $sp $sp -24                               # Allocate space on stack
+	sw $ra 0($sp)                                  # save return addr on stack
+	sw $s0 4($sp)                                  # Save s0 on stack
+	sw $s1 8($sp)                                  # Save s1 on stack
+	sw $s2 12($sp)                                 # Save s2 on stack
+	sw $s3 16($sp)                                 # Save s3 on stack
+	sw $s4 20($sp)                                 # Save s3 on stack
+	move $s0 $a0                                   # Make a copy of buffer pointer
+	lbu $s2 0($s0)                                  # s2 = rows => new columns
+	lbu $s3 4($s0)                                  # s3 = columns => new rows
+	addi $s0 $s0 8
+	mul $t2 $s2 $s3                                # Get total needed space, t2 = buffer space
+	addi $t0 $t2 2                                 # +2 for row/col ints
+	li $t1 4
+	mul $t0 $t0 $t1                                # x4 for words
+	sub $sp $sp $t0                                # Allocate stack space for buffer copy
+	sb $s3 0($sp)
+	sb $s2 4($sp)
+	addi $sp $sp 8
+	li $t3 0                                       # Buffer pointer counter (Tracks index)
+	transposeloop:
+		# Divide index by row length (num of cols) to get row index of value
+		# Modulo index by row length (num of cols) to get col index.
+		# Swap row/col to get new location, and decode into index = row*(numcols)+col
+		beqz $t2 transposeend
+		lbu $t5 0($s0)                  # Load object in buffer
+		div $t3 $s3                    # Get row index
+		mflo $t8                       # Store in t8 = ROW => new COL
+		mfhi $t9                       # Store in t9 = COL => new ROW
+		mul $t4 $t9 $s2                # row*numcols
+		add $t4 $t4 $t8                # +col
+		mul $t4 $t4 $t1
+		add $t6 $t4 $sp                # go to index in stack
+		sb $t5 0($t6)                  # Save into stack
+		addi $s0 $s0 4                 # Increment buffer pointer
+		addi $t3 $t3 1                 # Increment index counter
+		addi $t2 $t2 -1
+		j transposeloop
+	
+	transposeend:
+		move $t2 $sp                    # Copy of base pointer
+		
+	mirrorloop:
+		beqz $s3 mirrordone
+		move $t8 $t2                    # t8 = first int of row
+		mul $t6 $s2 $t1                 # x4
+		add $t9 $t2 $t6                 # t9 = last int of row + 1
+		addi $t9 $t9 -4                 # last int of row
+		mirrorinner:
+			beq $t8 $t9 innerdone
+			blt $t9 $t8 innerdone
+			lbu $s1 0($t8)               # s1 = lower int
+			lbu $s4 0($t9)               # s4 = higher int
+			move $t4 $s1
+			move $s1 $s4                # Swap values
+			move $s4 $t4
+			sb $s1 0($t8)               # reload values back into stack
+			sb $s4 0($t9)               #
+			addi $t8 $t8 4
+			addi $t9 $t9 -4
+			j mirrorinner
+		innerdone:	
+			add $t2 $t2 $t6                 # Jump to next row
+			addi $s3 $s3 -1                 # Decrement rows remaining counter
+			j mirrorloop		
+	mirrordone:
+		addi $sp $sp -8
+		move $s0 $t0
+		move $a0 $a1
+		move $a1 $sp
+		jal write_file
+		move $t0 $s0
+		add $sp $sp $t0                      # Deallocate stack
+		lw $ra 0($sp)                                  # load return addr on stack
+		lw $s0 4($sp)                                  # load s0 on stack
+		lw $s1 8($sp)                                  # load s1 on stack
+		lw $s2 12($sp)                                 # load s2 on stack
+		lw $s3 16($sp)                                 # load s3 on stack
+		lw $s4 20($sp)                                 # load s3 on stack
+		addi $sp $sp 24
+		jr $ra
 
 .globl rotate_clkws_180
-rotate_clkws_180:
- jr $ra
+rotate_clkws_180: #a0 = buffer, a1 = output filename
+	addi $sp $sp -16                          # Allocate stack
+	sw $ra 0($sp)                            # Save ra on stack
+	sw $s0 4($sp)                            # Save ra on stack
+	sw $s1 8($sp)                            # Save ra on stack
+	sw $s2 12($sp)                            # Save ra on stack
+	move $s0 $a0
+	move $s1 $a1
+	jal rotate_clkws_90
+	move $a1 $s0 
+	move $a0 $s1
+	jal initialize
+	move $a0 $s0 
+	move $a1 $s1
+	jal rotate_clkws_90
+	lw $ra 0($sp)                            # Load ra on stack
+	lw $s0 4($sp)                            # Load ra on stack
+	lw $s1 8($sp)                            # Load ra on stack
+	lw $s2 12($sp)                            # Load ra on stack
+	addi $sp $sp 16                          # DeAllocate stack
+ 	jr $ra
 
 .globl rotate_clkws_270
 rotate_clkws_270:
+	addi $sp $sp -16                          # Allocate stack
+	sw $ra 0($sp)                            # Save ra on stack
+	sw $s0 4($sp)                            # Save ra on stack
+	sw $s1 8($sp)                            # Save ra on stack
+	sw $s2 12($sp)                            # Save ra on stack
+	move $s0 $a0
+	move $s1 $a1
+	jal rotate_clkws_90
+	move $a1 $s0 
+	move $a0 $s1
+	jal initialize
+	move $a0 $s0 
+	move $a1 $s1
+	jal rotate_clkws_90
+	move $a1 $s0 
+	move $a0 $s1
+	jal initialize
+	move $a0 $s0 
+	move $a1 $s1
+	jal rotate_clkws_90
+	lw $ra 0($sp)                            # Load ra on stack
+	lw $s0 4($sp)                            # Load ra on stack
+	lw $s1 8($sp)                            # Load ra on stack
+	lw $s2 12($sp)                            # Load ra on stack
+	addi $sp $sp 16                          # DeAllocate stack
+ 	jr $ra
  jr $ra
 
 .globl mirror
